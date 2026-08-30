@@ -30,6 +30,7 @@ Future<void> main() async {
   runApp(ProviderScope(
     overrides: [
       localAuthProvider.overrideWith((ref) => isLoggedIn),
+      localUserProvider.overrideWith((ref) => isLoggedIn ? 'admin' : null),
     ],
     child: const FreeMapReviewApp(),
   ));

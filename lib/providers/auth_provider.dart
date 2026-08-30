@@ -8,19 +8,19 @@ final supabaseServiceProvider = Provider<SupabaseService>((ref) {
 });
 
 final authStateProvider = StreamProvider<bool>((ref) {
-  if (!AppConstants.isSupabaseConfigured) return const Stream.empty();
   final service = ref.watch(supabaseServiceProvider);
+  if (!AppConstants.isSupabaseConfigured || service.client == null) return const Stream.empty();
   return service.authStateChanges.map((state) => state.session != null);
 });
 
 final currentUserProvider = Provider<User?>((ref) {
-  if (!AppConstants.isSupabaseConfigured) return null;
   final service = ref.watch(supabaseServiceProvider);
+  if (!AppConstants.isSupabaseConfigured || service.client == null) return null;
   return service.currentUser;
 });
 
 final isAuthenticatedProvider = Provider<bool>((ref) {
-  if (!AppConstants.isSupabaseConfigured) return false;
   final service = ref.watch(supabaseServiceProvider);
+  if (!AppConstants.isSupabaseConfigured || service.client == null) return false;
   return service.isAuthenticated;
 });

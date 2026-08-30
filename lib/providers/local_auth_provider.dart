@@ -11,21 +11,13 @@ final localDatabaseServiceProvider = Provider<LocalDatabaseService>((ref) {
   return LocalDatabaseService();
 });
 
-final localAuthProvider = StateProvider<bool>((ref) => false);
+final localAuthProvider = StateProvider<bool>((ref) {
+  return false;
+});
 
 final localUserProvider = StateProvider<String?>((ref) => null);
 
 final rememberMeProvider = StateProvider<bool>((ref) => false);
-
-final initialLocalAuthProvider = FutureProvider<bool>((ref) async {
-  final prefs = await SharedPreferences.getInstance();
-  final remember = prefs.getBool(_kRememberMeKey) ?? false;
-  if (!remember) return false;
-
-  final isAuth = prefs.getBool(_kLocalAuthKey) ?? false;
-  final user = prefs.getString(_kLocalUserKey);
-  return isAuth && user != null && user.isNotEmpty;
-});
 
 final localAuthNotifierProvider = Provider<ValueNotifier<bool>>((ref) {
   return ValueNotifier<bool>(false);
