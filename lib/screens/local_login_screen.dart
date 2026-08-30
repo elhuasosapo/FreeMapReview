@@ -9,6 +9,7 @@ class LocalLoginScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
+    final rememberMe = ref.watch(rememberMeProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Login Locale')),
@@ -25,6 +26,13 @@ class LocalLoginScreen extends ConsumerWidget {
               decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),
+            CheckboxListTile(
+              title: const Text('Ricorda login'),
+              value: ref.watch(rememberMeProvider),
+              onChanged: (value) {
+                rememberMe.state = value ?? false;
+              },
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
@@ -32,7 +40,11 @@ class LocalLoginScreen extends ConsumerWidget {
                     passwordController.text == '0000') {
                   ref.read(localAuthProvider.notifier).state = true;
                   ref.read(localUserProvider.notifier).state = 'admin';
-                  Navigator.of(context).pop();
+                  ref.read(localAuthNotifierProvider).value = true;
+                  saveLocalAuth(true, 'admin', remember: ref.read(rememberMeProvider));
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Credenziali non valide')),

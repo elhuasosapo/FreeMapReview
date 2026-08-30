@@ -1,13 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/constants.dart';
 import '../models/review.dart';
 import '../services/supabase_service.dart';
 import 'auth_provider.dart';
 
 final reviewsByLocationProvider = FutureProvider.family<List<Review>, String>((ref, locationId) async {
+  if (!AppConstants.isSupabaseConfigured) return [];
   final service = ref.watch(supabaseServiceProvider);
   try {
-    final response = await service.client
+    final response = await service.client!
         .from('reviews')
         .select('*, user_profiles(name)')
         .eq('location_id', locationId)
@@ -23,9 +25,10 @@ final reviewsByLocationProvider = FutureProvider.family<List<Review>, String>((r
 });
 
 final allReviewsByLocationProvider = FutureProvider.family<List<Review>, String>((ref, locationId) async {
+  if (!AppConstants.isSupabaseConfigured) return [];
   final service = ref.watch(supabaseServiceProvider);
   try {
-    final response = await service.client
+    final response = await service.client!
         .from('reviews')
         .select('*, user_profiles(name)')
         .eq('location_id', locationId)
@@ -45,9 +48,12 @@ class ReviewNotifier extends StateNotifier<AsyncValue<void>> {
   ReviewNotifier(this._service) : super(const AsyncValue.data(null));
 
   Future<void> addReview(String locationId, Review review) async {
+    if (!AppConstants.isSupabaseConfigured || _service.client == null) {
+      throw Exception('Supabase non configurato');
+    }
     state = const AsyncValue.loading();
     try {
-      await _service.client.from('reviews').insert(review.toJson());
+      await _service.client!.from('reviews').insert(review.toJson());
       state = const AsyncValue.data(null);
     } on PostgrestException catch (e) {
       state = AsyncValue.error(Exception(e.message), StackTrace.current);

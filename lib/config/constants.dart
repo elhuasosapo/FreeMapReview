@@ -13,4 +13,5 @@ class AppConstants {
   static const Duration apiTimeout = Duration(seconds: 30);
 
   static bool get isWeb => kIsWeb;
+  static bool get isSupabaseConfigured => supabaseUrl != 'https://YOUR_PROJECT.supabase.co' && supabaseAnonKey != 'YOUR_PUBLISHABLE_KEY';
 }

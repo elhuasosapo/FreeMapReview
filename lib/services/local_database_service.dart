@@ -51,7 +51,15 @@ class LocalDatabaseService {
 
   Future<List<Location>> getLocalLocations() async {
     final locations = await _readJson(_locationsFile);
-    return locations.map((json) => Location.fromJson(json)).toList();
+    final reviews = await _readJson(_reviewsFile);
+
+    return locations.map((json) {
+      final locationReviews = reviews
+          .where((r) => r['location_id'] == json['id'])
+          .map((r) => Review.fromJson(r))
+          .toList();
+      return Location.fromJson(json, reviews: locationReviews);
+    }).toList();
   }
 
   Future<void> deleteLocalLocation(String id) async {

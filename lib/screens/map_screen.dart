@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../config/constants.dart';
 import '../models/location.dart';
 import '../providers/auth_provider.dart';
@@ -13,9 +14,11 @@ import '../widgets/review_card.dart';
 import 'location_detail_screen.dart';
 import 'filter_search_sheet.dart';
 import 'local_login_screen.dart';
+import 'locations_list_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key});
+  final LatLng? initialTarget;
+  const MapScreen({super.key, this.initialTarget});
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -27,6 +30,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   String _searchQuery = '';
   final List<Marker> _markers = [];
   final List<Category> _selectedCategories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listen<AsyncValue<List<Location>>>(
+        locationsProvider,
+        (previous, next) {
+          if (next.hasValue) {
+            _loadFilteredLocations();
+          }
+        },
+      );
+      _loadFilteredLocations();
+    });
+
+    if (widget.initialTarget != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _mapController.move(widget.initialTarget!, 16);
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,31 +103,61 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                      ],
                    ),
                    child: Row(
-                     children: [
-                       Expanded(
-                         child: TextField(
-                           decoration: InputDecoration(
-                             hintText: 'Cerca luoghi...',
-                             prefixIcon: const Icon(Icons.search),
-                             border: InputBorder.none,
-                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                           ),
-                           onChanged: (query) async {
-                             setState(() => _searchQuery = query);
-                             _loadFilteredLocations();
-                           },
-                         ),
-                       ),
-                       if (!isLocalAuth && !isAuthenticated)
-                         IconButton(
-                           onPressed: () {
-                             Navigator.of(context).push(
-                               MaterialPageRoute(builder: (_) => const LocalLoginScreen()),
-                             );
-                           },
-                           icon: const Icon(Icons.login),
-                           tooltip: 'Login Locale',
-                         ),
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Cerca luoghi...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                            onChanged: (query) async {
+                              setState(() => _searchQuery = query);
+                              _loadFilteredLocations();
+                            },
+                          ),
+                        ),
+                        if (isLocalAuth)
+                          IconButton(
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Logout'),
+                                  content: const Text('Vuoi effettuare il logout locale?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+                                    TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Logout')),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                ref.read(localAuthProvider.notifier).state = false;
+                                ref.read(localUserProvider.notifier).state = null;
+                                ref.read(rememberMeProvider.notifier).state = false;
+                                ref.read(localAuthNotifierProvider).value = false;
+                                await clearLocalAuth();
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Logout effettuato')),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.logout),
+                            tooltip: 'Logout',
+                          ),
+                        if (!isLocalAuth && !isAuthenticated)
+                          IconButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const LocalLoginScreen()),
+                              );
+                            },
+                            icon: const Icon(Icons.login),
+                            tooltip: 'Login Locale',
+                          ),
                      ],
                    ),
                  ),
@@ -136,6 +193,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              onPressed: () {
+                GoRouter.of(context).go('/locations');
+              },
+              backgroundColor: theme.colorScheme.tertiary,
+              foregroundColor: theme.colorScheme.onTertiary,
+              child: const Icon(Icons.list),
             ),
           ),
           Positioned(

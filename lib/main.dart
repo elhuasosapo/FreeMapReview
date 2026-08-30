@@ -10,63 +10,116 @@ import 'screens/location_detail_screen.dart';
 import 'screens/add_review_screen.dart';
 import 'screens/add_location_screen.dart';
 import 'screens/local_login_screen.dart';
+import 'screens/locations_list_screen.dart';
+import 'providers/local_auth_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: AppConstants.supabaseUrl,
-    publishableKey: AppConstants.supabaseAnonKey,
-  );
+  if (AppConstants.isSupabaseConfigured) {
+    await Supabase.initialize(
+      url: AppConstants.supabaseUrl,
+      publishableKey: AppConstants.supabaseAnonKey,
+    );
+  }
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  runApp(const ProviderScope(child: FreeMapReviewApp()));
+  final isLoggedIn = await loadLocalAuth();
+
+  runApp(ProviderScope(
+    overrides: [
+      localAuthProvider.overrideWith((ref) => isLoggedIn),
+    ],
+    child: const FreeMapReviewApp(),
+  ));
 }
 
-final GoRouter router = GoRouter(
-  routes: [
-    GoRoute(
-      path: '/',
-      builder: (_, __) => const MapScreen(),
-    ),
-    GoRoute(
-      path: '/login-local',
-      builder: (_, __) => const LocalLoginScreen(),
-    ),
-    GoRoute(
-      path: '/location/:id',
-      builder: (context, state) {
-        final id = state.pathParameters['id']!;
-        return LocationDetailScreen(locationId: id);
-      },
-    ),
-    GoRoute(
-      path: '/location/:id/review',
-      builder: (context, state) {
-        final id = state.pathParameters['id']!;
-        return AddReviewScreen(locationId: id);
-      },
-    ),
-    GoRoute(
-      path: '/add-location',
-      builder: (context, state) {
-        final lat = state.uri.queryParameters['lat'];
-        final lng = state.uri.queryParameters['lng'];
-        final position = lat != null && lng != null
-            ? LatLng(double.parse(lat), double.parse(lng))
-            : null;
-        return AddLocationScreen(initialPosition: position);
-      },
-    ),
-  ],
-);
-
-class FreeMapReviewApp extends ConsumerWidget {
+class FreeMapReviewApp extends ConsumerStatefulWidget {
   const FreeMapReviewApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FreeMapReviewApp> createState() => _FreeMapReviewAppState();
+}
+
+class _FreeMapReviewAppState extends ConsumerState<FreeMapReviewApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = _createRouter();
+  }
+
+  GoRouter _createRouter() {
+    final authNotifier = ref.read(localAuthNotifierProvider);
+    final router = GoRouter(
+      refreshListenable: authNotifier,
+      redirect: (context, state) {
+        final isLoggedIn = ref.read(localAuthProvider);
+        final isLoginRoute = state.matchedLocation == '/login-local';
+
+        if (!isLoggedIn && !isLoginRoute) {
+          return '/login-local';
+        }
+        if (isLoggedIn && isLoginRoute) {
+          return '/';
+        }
+        return null;
+      },
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) {
+            final lat = state.uri.queryParameters['lat'];
+            final lng = state.uri.queryParameters['lng'];
+            final target = (lat != null && lng != null)
+                ? LatLng(double.parse(lat), double.parse(lng))
+                : null;
+            return MapScreen(initialTarget: target);
+          },
+        ),
+        GoRoute(
+          path: '/login-local',
+          builder: (_, __) => const LocalLoginScreen(),
+        ),
+        GoRoute(
+          path: '/locations',
+          builder: (_, __) => const LocationsListScreen(),
+        ),
+        GoRoute(
+          path: '/location/:id',
+          builder: (context, state) {
+            final id = state.pathParameters['id']!;
+            return LocationDetailScreen(locationId: id);
+          },
+        ),
+        GoRoute(
+          path: '/location/:id/review',
+          builder: (context, state) {
+            final id = state.pathParameters['id']!;
+            return AddReviewScreen(locationId: id);
+          },
+        ),
+        GoRoute(
+          path: '/add-location',
+          builder: (context, state) {
+            final lat = state.uri.queryParameters['lat'];
+            final lng = state.uri.queryParameters['lng'];
+            final position = (lat != null && lng != null)
+                ? LatLng(double.parse(lat), double.parse(lng))
+                : null;
+            return AddLocationScreen(initialPosition: position);
+          },
+        ),
+      ],
+    );
+
+    return router;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: AppConstants.appName,
       theme: ThemeData(
@@ -80,7 +133,7 @@ class FreeMapReviewApp extends ConsumerWidget {
         brightness: Brightness.dark,
       ),
       themeMode: ThemeMode.system,
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }

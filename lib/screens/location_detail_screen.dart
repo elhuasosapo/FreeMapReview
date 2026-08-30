@@ -8,18 +8,29 @@ import '../widgets/review_card.dart';
 import 'add_review_screen.dart';
 
 class LocationDetailScreen extends ConsumerWidget {
-  final String locationId;
+  final String? locationId;
+  final Location? location;
 
   const LocationDetailScreen({
     super.key,
-    required this.locationId,
+    this.locationId,
+    this.location,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final locationAsync = ref.watch(locationByIdProvider(locationId));
-    final reviewsAsync = ref.watch(reviewsByLocationProvider(locationId));
+
+    if (location != null) {
+      return _buildScaffold(context, theme, location!);
+    }
+
+    if (locationId == null) {
+      return const Scaffold(body: Center(child: Text('Luogo non valido')));
+    }
+
+    final locationAsync = ref.watch(locationByIdProvider(locationId!));
+    final reviewsAsync = ref.watch(reviewsByLocationProvider(locationId!));
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
 
     return Scaffold(
@@ -32,7 +43,7 @@ class LocationDetailScreen extends ConsumerWidget {
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => AddReviewScreen(locationId: locationId),
+                    builder: (_) => AddReviewScreen(locationId: locationId!),
                   ),
                 );
               },
@@ -40,72 +51,70 @@ class LocationDetailScreen extends ConsumerWidget {
         ],
       ),
       body: locationAsync.when(
-        data: (location) {
-          if (location == null) {
+        data: (loc) {
+          if (loc == null) {
             return const Center(child: Text('Luogo non trovato'));
           }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  location.name,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Chip(
-                  label: Text(location.category.label),
-                  backgroundColor: _getCategoryColor(location.category),
-                ),
-                const SizedBox(height: 16),
-                if (location.description != null && location.description!.isNotEmpty)
-                  Text(location.description!),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(Icons.star, color: Colors.amber),
-                    const SizedBox(width: 4),
-                    Text(
-                      location.averageRating.toStringAsFixed(1),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '${location.reviewCount} recensioni',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Recensioni',
-                  style: theme.textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                reviewsAsync.when(
-                  data: (reviews) {
-                    if (reviews.isEmpty) {
-                      return const Text('Nessuna recensione ancora');
-                    }
-                    return Column(
-                      children: reviews
-                          .map((r) => ReviewCard(review: r, showFullText: true))
-                          .toList(),
-                    );
-                  },
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Text('Errore: $e'),
-                ),
-              ],
-            ),
-          );
+          return _buildScaffold(context, theme, loc);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Errore: $e')),
+      ),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, ThemeData theme, Location loc) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(loc.name),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loc.name,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Chip(
+              label: Text(loc.category.label),
+              backgroundColor: _getCategoryColor(loc.category),
+            ),
+            const SizedBox(height: 16),
+            if (loc.description != null && loc.description!.isNotEmpty)
+              Text(loc.description!),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.star, color: Colors.amber),
+                const SizedBox(width: 4),
+                Text(
+                  loc.averageRating.toStringAsFixed(1),
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  '${loc.reviewCount} recensioni',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Recensioni recenti',
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            if (loc.reviews != null && loc.reviews!.isNotEmpty)
+              ...loc.reviews!.take(3).map((r) => ReviewCard(review: r, showFullText: true))
+            else
+              const Text('Nessuna recensione ancora'),
+          ],
+        ),
       ),
     );
   }
