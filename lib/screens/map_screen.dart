@@ -124,8 +124,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             bottom: 16,
             child: FloatingActionButton.extended(
               onPressed: () => _showFilterSearchSheet(context),
-              icon: const Icon(Icons.filter_list),
-              label: const Text('Filtri'),
+              icon: const Icon(Icons.edit_location),
+              label: const Text('Gestione Mappa'),
+            ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 88,
+            child: FloatingActionButton(
+              onPressed: _centerOnUserPosition,
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
+              child: const Icon(Icons.my_location),
             ),
           ),
         ],
@@ -227,6 +237,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         onSearchCompleted: _loadFilteredLocations,
       ),
     );
+  }
+
+  Future<void> _centerOnUserPosition() async {
+    final service = ref.read(mapServiceProvider);
+    final hasPermission = await service.checkLocationPermission();
+    if (!hasPermission) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Permessi di localizzazione negati')),
+      );
+      return;
+    }
+    final position = await service.getCurrentLocation();
+    if (position != null && mounted) {
+      _mapController.move(position, 15.0);
+    }
   }
 
   Color _getCategoryColor(Category category) {

@@ -44,8 +44,8 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.5,
-      minChildSize: 0.3,
+      initialChildSize: 0.6,
+      minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (_, controller) => Column(
         children: [
@@ -134,7 +134,6 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
               key: _formKey,
               child: ListView(
                 padding: const EdgeInsets.all(16),
-                controller: controller,
                 children: [
                   // Location name field
                   TextFormField(
@@ -353,7 +352,11 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
         return;
       }
       final position = await mapService.getCurrentLocation();
-      setState(() => _selectedPosition = position);
+      if (mounted) {
+        setState(() {
+          _selectedPosition = position;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -591,7 +594,11 @@ class _MapSelectionSheetState extends ConsumerState<_MapSelectionSheet> {
         return;
       }
       final position = await mapService.getCurrentLocation();
-      setState(() => _selectedPosition = position);
+      if (mounted) {
+        setState(() {
+          _selectedPosition = position;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

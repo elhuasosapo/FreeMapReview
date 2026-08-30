@@ -2,15 +2,17 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/constants.dart';
 
 class ImageService {
+  final SupabaseClient _supabase;
+
+  ImageService(this._supabase);
+
   final ImagePicker _picker = ImagePicker();
-  final SupabaseClient _supabase = Supabase.instance.client;
 
   Future<File?> pickImage(ImageSource source) async {
     final XFile? picked = await _picker.pickImage(
@@ -21,25 +23,7 @@ class ImageService {
     );
 
     if (picked == null) return null;
-
-    final cropped = await _cropImage(File(picked.path));
-    return cropped;
-  }
-
-  Future<File?> _cropImage(File imageFile) async {
-    final CroppedFile? cropped = await ImageCropper().cropImage(
-      sourcePath: imageFile.path,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop Image',
-          hideBottomControls: false,
-        ),
-        IOSUiSettings(title: 'Crop Image'),
-      ],
-    );
-
-    if (cropped == null) return imageFile;
-    return File(cropped.path);
+    return File(picked.path);
   }
 
   Future<List<String>> uploadImages(List<File> images) async {

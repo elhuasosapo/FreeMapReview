@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/image_service.dart';
+import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class ImageUploader extends StatefulWidget {
+class ImageUploader extends ConsumerStatefulWidget {
   final Function(List<String>) onImagesSelected;
   final int maxImages;
 
@@ -14,11 +17,11 @@ class ImageUploader extends StatefulWidget {
   });
 
   @override
-  State<ImageUploader> createState() => _ImageUploaderState();
+  ConsumerState<ImageUploader> createState() => _ImageUploaderState();
 }
 
-class _ImageUploaderState extends State<ImageUploader> {
-  final ImageService _imageService = ImageService();
+class _ImageUploaderState extends ConsumerState<ImageUploader> {
+  final ImageService _imageService = ImageService(Supabase.instance.client);
   final List<File> _selectedImages = [];
   bool _isUploading = false;
 
@@ -33,7 +36,6 @@ class _ImageUploaderState extends State<ImageUploader> {
     final image = await _imageService.pickImage(source);
     if (image != null && mounted) {
       setState(() => _selectedImages.add(image));
-      widget.onImagesSelected(_selectedImages.map((f) => f.path).toList());
     }
   }
 
