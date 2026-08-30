@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/location.dart';
 import '../providers/auth_provider.dart';
+import '../providers/local_auth_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/service_provider.dart';
 
@@ -42,6 +43,8 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final isLocalAuth = ref.watch(localAuthProvider);
+    final canAdd = isAuthenticated || isLocalAuth;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
@@ -256,7 +259,7 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
                   ElevatedButton.icon(
                     onPressed: _isSubmitting
                         ? null
-                        : () => _submitLocation(context, isAuthenticated),
+                        : () => _submitLocation(context, canAdd),
                     icon: _isSubmitting
                         ? const SizedBox(
                             width: 20,
@@ -267,7 +270,7 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
                     label: Text(
                       _isSubmitting
                           ? 'Salvataggio...'
-                          : (isAuthenticated ? 'Aggiungi Luogo' : 'Accedi per aggiungere'),
+                          : (canAdd ? 'Aggiungi Luogo' : 'Accedi per aggiungere'),
                     ),
                     style: ElevatedButton.styleFrom(
                       disabledBackgroundColor: theme.colorScheme.onSurface.withOpacity(0.12),
@@ -382,7 +385,9 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
   Future<void> _submitLocation(BuildContext context, bool isAuthenticated) async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (!isAuthenticated) {
+    final isLocal = ref.read(localAuthProvider);
+
+    if (!isLocal && !isAuthenticated) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Devi effettuare l\'accesso per aggiungere luoghi')),
       );
@@ -399,10 +404,13 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
     setState(() => _isSubmitting = true);
     try {
       final user = ref.read(supabaseServiceProvider).currentUser;
-      if (user == null) throw Exception('Utente non autenticato');
+
+      if (!isLocal && user == null) {
+        throw Exception('Utente non autenticato');
+      }
 
       final location = Location(
-        id: '',
+        id: isLocal ? DateTime.now().microsecondsSinceEpoch.toString() : '',
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim().isNotEmpty
             ? _descriptionController.text.trim()
@@ -412,10 +420,15 @@ class _FilterSearchSheetState extends ConsumerState<FilterSearchSheet> {
         category: _selectedCategory,
         isVerified: false,
         createdAt: DateTime.now(),
-        userId: user.id,
+        userId: isLocal ? 'local_admin' : user!.id,
       );
 
-      await ref.read(locationNotifierProvider.notifier).addLocation(location);
+      if (isLocal) {
+        final localDb = ref.read(localDatabaseServiceProvider);
+        await localDb.saveLocation(location);
+      } else {
+        await ref.read(locationNotifierProvider.notifier).addLocation(location);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

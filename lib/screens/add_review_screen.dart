@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/location.dart';
 import '../models/review.dart';
 import '../providers/auth_provider.dart';
+import '../providers/local_auth_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/review_provider.dart';
 import '../widgets/image_uploader.dart';
@@ -161,15 +162,19 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
 
     setState(() => _isSubmitting = true);
     try {
+      final isLocal = ref.read(localAuthProvider);
       final user = ref.read(supabaseServiceProvider).currentUser;
-      if (user == null) throw Exception('Utente non autenticato');
+
+      if (!isLocal && user == null) {
+        throw Exception('Accedi con Supabase o login locale per aggiungere recensioni');
+      }
 
       final categoryDetail = _isHealthcare && _hasVisited
           ? 'Pulizia: $_cleanliness, Attenzione: $_personalAttention, Attesa: $_waitingTime'
           : (_categoryDetailController.text.isNotEmpty ? _categoryDetailController.text : null);
 
       final review = Review(
-        id: '',
+        id: isLocal ? DateTime.now().microsecondsSinceEpoch.toString() : '',
         locationId: widget.locationId,
         rating: _rating,
         reviewText: _reviewTextController.text.isNotEmpty ? _reviewTextController.text : null,
@@ -179,7 +184,12 @@ class _AddReviewScreenState extends ConsumerState<AddReviewScreen> {
         createdAt: DateTime.now(),
       );
 
-      await ref.read(reviewNotifierProvider.notifier).addReview(widget.locationId, review);
+      if (isLocal) {
+        final localDb = ref.read(localDatabaseServiceProvider);
+        await localDb.saveReview(review);
+      } else {
+        await ref.read(reviewNotifierProvider.notifier).addReview(widget.locationId, review);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/location.dart';
 import '../providers/auth_provider.dart';
+import '../providers/local_auth_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/service_provider.dart';
+import '../widgets/image_uploader.dart';
 
 class AddLocationScreen extends ConsumerStatefulWidget {
   final LatLng? initialPosition;
@@ -188,11 +190,15 @@ class _AddLocationScreenState extends ConsumerState<AddLocationScreen> {
 
     setState(() => _isSubmitting = true);
     try {
+      final isLocal = ref.read(localAuthProvider);
       final user = ref.read(supabaseServiceProvider).currentUser;
-      if (user == null) throw Exception('Utente non autenticato');
+
+      if (!isLocal && user == null) {
+        throw Exception('Accedi con Supabase o login locale per aggiungere luoghi');
+      }
 
       final location = Location(
-        id: '',
+        id: isLocal ? DateTime.now().microsecondsSinceEpoch.toString() : '',
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
         lat: _selectedPosition!.latitude,
@@ -200,10 +206,15 @@ class _AddLocationScreenState extends ConsumerState<AddLocationScreen> {
         category: _selectedCategory,
         isVerified: false,
         createdAt: DateTime.now(),
-        userId: user.id,
+        userId: isLocal ? 'local_admin' : user!.id,
       );
 
-      await ref.read(locationNotifierProvider.notifier).addLocation(location);
+      if (isLocal) {
+        final localDb = ref.read(localDatabaseServiceProvider);
+        await localDb.saveLocation(location);
+      } else {
+        await ref.read(locationNotifierProvider.notifier).addLocation(location);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -5,12 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/constants.dart';
 import '../models/location.dart';
 import '../providers/auth_provider.dart';
+import '../providers/local_auth_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/service_provider.dart';
 import '../widgets/custom_map_marker.dart';
 import '../widgets/review_card.dart';
 import 'location_detail_screen.dart';
 import 'filter_search_sheet.dart';
+import 'local_login_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -30,6 +32,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final isLocalAuth = ref.watch(localAuthProvider);
 
     return Scaffold(
       body: Stack(
@@ -61,30 +64,46 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             right: 16,
             child: Column(
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Cerca luoghi...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                    onChanged: (query) async {
-                      setState(() => _searchQuery = query);
-                      _loadFilteredLocations();
-                    },
-                  ),
-                ),
+                 Container(
+                   decoration: BoxDecoration(
+                     color: theme.colorScheme.surface,
+                     borderRadius: BorderRadius.circular(12),
+                     boxShadow: [
+                       BoxShadow(
+                         color: Colors.black.withOpacity(0.1),
+                         blurRadius: 8,
+                       ),
+                     ],
+                   ),
+                   child: Row(
+                     children: [
+                       Expanded(
+                         child: TextField(
+                           decoration: InputDecoration(
+                             hintText: 'Cerca luoghi...',
+                             prefixIcon: const Icon(Icons.search),
+                             border: InputBorder.none,
+                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                           ),
+                           onChanged: (query) async {
+                             setState(() => _searchQuery = query);
+                             _loadFilteredLocations();
+                           },
+                         ),
+                       ),
+                       if (!isLocalAuth && !isAuthenticated)
+                         IconButton(
+                           onPressed: () {
+                             Navigator.of(context).push(
+                               MaterialPageRoute(builder: (_) => const LocalLoginScreen()),
+                             );
+                           },
+                           icon: const Icon(Icons.login),
+                           tooltip: 'Login Locale',
+                         ),
+                     ],
+                   ),
+                 ),
                 const SizedBox(height: 8),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -147,18 +166,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final asyncLocations = ref.read(locationsProvider);
 
     asyncLocations.when(
-      data: (allLocations) {
+      data: (allLocations) async {
+        var combinedLocations = List<Location>.from(allLocations);
+        if (combinedLocations.isEmpty && ref.read(localAuthProvider)) {
+          final localLocations = await ref.read(localDatabaseServiceProvider).getLocalLocations();
+          combinedLocations = [...combinedLocations, ...localLocations];
+        }
         final filter = LocationFilter(
           categories: _selectedCategories,
           query: _searchQuery,
         );
-        final filteredLocations = filter.filter(allLocations);
-        setState(() {
-          _markers.clear();
-          for (final location in filteredLocations) {
-            _markers.add(_createMarker(location));
-          }
-        });
+        final filteredLocations = filter.filter(combinedLocations);
+        if (mounted) {
+          setState(() {
+            _markers.clear();
+            for (final location in filteredLocations) {
+              _markers.add(_createMarker(location));
+            }
+          });
+        }
       },
       loading: () {},
       error: (_, __) {},
