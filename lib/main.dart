@@ -107,9 +107,19 @@ class _FreeMapReviewAppState extends ConsumerState<FreeMapReviewApp> {
           builder: (context, state) {
             final lat = state.uri.queryParameters['lat'];
             final lng = state.uri.queryParameters['lng'];
-            final position = (lat != null && lng != null)
-                ? LatLng(double.parse(lat), double.parse(lng))
-                : null;
+            LatLng? position;
+            if (lat != null && lng != null) {
+              try {
+                final latVal = double.parse(lat);
+                final lngVal = double.parse(lng);
+                // Validazione range coordinate
+                if (latVal >= -90 && latVal <= 90 && lngVal >= -180 && lngVal <= 180) {
+                  position = LatLng(latVal, lngVal);
+                }
+              } catch (e) {
+                // Ignora coordinate invalidhe
+              }
+            }
             return AddLocationScreen(initialPosition: position);
           },
         ),

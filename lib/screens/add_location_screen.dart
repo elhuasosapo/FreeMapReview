@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/location.dart';
 import '../providers/auth_provider.dart';
 import '../providers/local_auth_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/service_provider.dart';
-import '../widgets/image_uploader.dart';
 
 class AddLocationScreen extends ConsumerStatefulWidget {
   final LatLng? initialPosition;
@@ -29,7 +29,9 @@ class _AddLocationScreenState extends ConsumerState<AddLocationScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedPosition = widget.initialPosition;
+    if (widget.initialPosition != null) {
+      _selectedPosition = widget.initialPosition;
+    }
     _reverseGeocode();
   }
 
@@ -91,41 +93,47 @@ class _AddLocationScreenState extends ConsumerState<AddLocationScreen> {
             ),
             if (_selectedPosition != null)
               Container(
-                height: 200,
+                height: 250,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: theme.colorScheme.outline),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCenter: _selectedPosition!,
-                      initialZoom: 15.0,
-                      interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
-                      onTap: (_, point) {
-                        setState(() => _selectedPosition = point);
-                      },
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.freemapreview',
-                        subdomains: const ['a', 'b', 'c'],
-                      ),
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: _selectedPosition!,
-                            width: 40,
-                            height: 40,
-                            child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                          ),
-                        ],
-                      ),
-                    ],
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: _selectedPosition!,
+                    initialZoom: 15.0,
+                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.rotate),
+                    onTap: (_, point) {
+                      setState(() => _selectedPosition = point);
+                    },
                   ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.freemapreview',
+                      subdomains: const ['a', 'b', 'c'],
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _selectedPosition!,
+                          width: 40,
+                          height: 40,
+                          child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            if (_selectedPosition == null)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Nessuna posizione selezionata. Clicca su "Posizione corrente" o seleziona sulla mappa in alto.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[600]),
                 ),
               ),
             const SizedBox(height: 16),
@@ -136,7 +144,11 @@ class _AddLocationScreenState extends ConsumerState<AddLocationScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitLocation,
+              onPressed: _isSubmitting ? null : () async {
+                // Evita chiamate multiple
+                if (_isSubmitting) return;
+                await _submitLocation();
+              },
               child: _isSubmitting
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Text('Aggiungi Luogo'),
@@ -193,8 +205,14 @@ class _AddLocationScreenState extends ConsumerState<AddLocationScreen> {
       final isLocal = ref.read(localAuthProvider);
       final user = ref.read(supabaseServiceProvider).currentUser;
 
-      if (!isLocal && user == null) {
-        throw Exception('Accedi con Supabase o login locale per aggiungere luoghi');
+      if (!isLocal) {
+        if (user == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Effettua il login per aggiungere luoghi')),
+          );
+          setState(() => _isSubmitting = false);
+          return;
+        }
       }
 
       final location = Location(
@@ -210,17 +228,35 @@ class _AddLocationScreenState extends ConsumerState<AddLocationScreen> {
       );
 
       if (isLocal) {
-        final localDb = ref.read(localDatabaseServiceProvider);
-        await localDb.saveLocation(location);
+        try {
+          final localDb = ref.read(localDatabaseServiceProvider);
+          await localDb.saveLocation(location);
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Errore salvataggio locale: $e')),
+            );
+          }
+          return;
+        }
       } else {
-        await ref.read(locationNotifierProvider.notifier).addLocation(location);
+        try {
+          await ref.read(locationNotifierProvider.notifier).addLocation(location);
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Errore salvataggio: $e')),
+            );
+          }
+          return;
+        }
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Luogo aggiunto con successo')),
         );
-        Navigator.of(context).pop();
+        context.go('/');
       }
     } catch (e) {
       if (mounted) {
