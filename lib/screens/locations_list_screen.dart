@@ -29,6 +29,10 @@ class _LocationsListScreenState extends ConsumerState<LocationsListScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/'),
+        ),
         title: const Text('Luoghi Salvati'),
       ),
       body: Column(

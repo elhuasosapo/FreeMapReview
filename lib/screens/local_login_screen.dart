@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/local_auth_provider.dart';
 
 class LocalLoginScreen extends ConsumerWidget {
@@ -43,7 +44,7 @@ class LocalLoginScreen extends ConsumerWidget {
                   ref.read(localAuthNotifierProvider).value = true;
                   saveLocalAuth(true, 'admin', remember: ref.read(rememberMeProvider));
                   if (context.mounted) {
-                    Navigator.of(context).pop();
+                    context.pop();
                   }
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
