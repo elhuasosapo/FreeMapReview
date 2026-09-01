@@ -32,6 +32,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Chiede il permesso all'avvio e centra la mappa di conseguenza
+    // Aggiungo un ritardo per assicurarmi che la mappa sia pronta
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          _requestAndCenterOnLocation();
+        }
+      });
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.listen<AsyncValue<List<Location>>>(
         locationsProvider,
@@ -50,6 +61,37 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           _mapController.move(widget.initialTarget!, 16);
         }
       });
+    }
+  }
+
+  Future<void> _requestAndCenterOnLocation() async {
+    // Solo se non è stato passato un target specifico
+    if (widget.initialTarget != null) {
+      return;
+    }
+
+    final service = ref.read(mapServiceProvider);
+    
+    // Chiede esplicitamente il permesso all'avvio
+    final hasPermission = await service.checkLocationPermission();
+    
+    if (hasPermission) {
+      // Permesso concesso, tenta di ottenere la posizione
+      try {
+        final position = await service.getCurrentLocation();
+        if (mounted) {
+          // Usa move per centrare la mappa
+          _mapController.move(position, 15.0);
+          return; // Esce se la posizione è stata centrata
+        }
+      } catch (e) {
+        // Errore nel recuperare la posizione, continua con il fallback
+      }
+    }
+    
+    // Fallback su Roma se permesso negato o errore
+    if (mounted) {
+      _mapController.move(const LatLng(41.9028, 12.4964), 13.0);
     }
   }
 

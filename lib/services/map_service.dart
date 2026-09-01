@@ -86,4 +86,12 @@ class MapService {
 
     return true;
   }
+
+  Future<bool> hasLocationPermission() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return false;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    return permission != LocationPermission.denied && permission != LocationPermission.deniedForever;
+  }
 }
